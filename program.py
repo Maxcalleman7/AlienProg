@@ -1,8 +1,17 @@
+"""Quick static charts from a NUFORC sightings CSV.
+
+Usage: python program.py ufo_sightings.csv
+
+Writes PNG charts to nuforc_out/ and prints the busiest calendar days.
+"""
+
 import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import pandas as pd
+
+from timezones import to_local
 
 OUT = Path("nuforc_out")
 OUT.mkdir(exist_ok=True)
@@ -15,6 +24,7 @@ CANDIDATES = {
     "state": ["state", "State"],
     "lat": ["latitude", "lat"],
     "lon": ["longitude", "lon", "lng"],
+    "country": ["country_code", "country", "Country"],
 }
 
 
@@ -33,6 +43,8 @@ def load(path):
         sys.exit(f"No time column found. Columns are: {list(df.columns)}")
     df["t"] = pd.to_datetime(df[cols["time"]], errors="coerce")
     df = df.dropna(subset=["t"])
+    df["t"] = to_local(df.t, df[cols["state"]] if cols["state"] else None,
+                       df[cols["country"]] if cols["country"] else None)
     df = df[(df.t.dt.year >= 1940) & (df.t.dt.year <= pd.Timestamp.now().year)]
     return df, cols
 

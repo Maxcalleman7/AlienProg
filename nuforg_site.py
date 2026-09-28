@@ -1,3 +1,10 @@
+"""Interactive HTML report from a NUFORC sightings CSV.
+
+Usage: python nuforg_site.py ufo_sightings.csv
+
+Writes nuforc_report.html and opens it in the browser.
+"""
+
 import json
 import sys
 import webbrowser
@@ -5,6 +12,8 @@ from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
+
+from timezones import to_local
 
 # Years used for the "typical day" calculations. Reporting exploded after the
 # mid-1990s and 2023 is a partial year, so we only use full recent years.
@@ -16,6 +25,7 @@ OUT_FILE = Path("nuforc_report.html")
 TIME_COLS = ["reported_date_time", "datetime", "date_time", "Date / Time", "date", "occurred"]
 SHAPE_COLS = ["shape", "Shape"]
 STATE_COLS = ["state", "State"]
+COUNTRY_COLS = ["country_code", "country", "Country"]
 
 
 def first_col(df, names):
@@ -34,6 +44,9 @@ def build_data(path):
         sys.exit(f"No time column found. Columns are: {list(df.columns)}")
     df["t"] = pd.to_datetime(df[tcol], errors="coerce")
     df = df.dropna(subset=["t"])
+    stcol = first_col(df, STATE_COLS)
+    ccol = first_col(df, COUNTRY_COLS)
+    df["t"] = to_local(df.t, df[stcol] if stcol else None, df[ccol] if ccol else None)
     df = df[(df.t.dt.year >= 1940) & (df.t.dt.year <= pd.Timestamp.now().year)]
     df["year"] = df.t.dt.year
     df["md"] = df.t.dt.strftime("%m-%d")
@@ -48,7 +61,6 @@ def build_data(path):
 
     scol = first_col(df, SHAPE_COLS)
     shapes = df[scol].astype(str).str.lower().value_counts().head(15) if scol else None
-    stcol = first_col(df, STATE_COLS)
     states = df[stcol].astype(str).str.upper().value_counts().head(15) if stcol else None
 
     # Calendar-day analysis over full recent years
